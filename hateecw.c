@@ -49,29 +49,22 @@ NCSEcwReadStatus showcb(NCSFileView *fw) {
 		img_ += bpl;
 	}
 	free(img__);
-	/*
-	img[520] = 234;
-	img[521] = 234;
-	img[522] = 234;
-	img[523] = 234;
-	img[524] = 234;
-	*/
 
-	/*
-	XVisualInfo xvi;
-	Status s = XMatchVisualInfo(D, S, 24, DirectColor, &xvi);
-	assert(s);
-	*/
 	//printf("%i %i %i\n", DefaultDepth(D, S), WX, WY);
+	XLockDisplay(D);
 	XImage *xi = XCreateImage(D, DefaultVisual(D, S), DefaultDepth(D, S), ZPixmap, 0, (void *)img, vi->nSizeX, vi->nSizeY, 32, bpl);
 	assert(xi);
 	XPutImage(D, W, Gc, xi, 0, 0, 0, 0, WX, WY);
+	XFlush(D);
 	XDestroyImage(xi);
+	XUnlockDisplay(D);
 	return NCSECW_READ_OK;
 }
 
 int main(int argc, char *argv[]) {
 	if (argc < 2) return 1;
+
+	XInitThreads();
 	D = XOpenDisplay(NULL);
 	assert(D);
 	S = DefaultScreen(D);
@@ -112,7 +105,9 @@ int main(int argc, char *argv[]) {
 				//NCS(NCScbmSetFileView(fw, bands, bl, x, y, w, h, WX, WY));
 				break;
 			case KeyPress: {
+				XLockDisplay(D);
 				KeySym ks = XKeycodeToKeysym(D, (KeyCode)ev.xkey.keycode, 0);
+				XUnlockDisplay(D);
 				int_fast32_t t;
 				switch (ks) {
 					case XK_Up:
@@ -161,8 +156,10 @@ int main(int argc, char *argv[]) {
 			default:
 				break;
 		}
-
 	}
+
+	XLockDisplay(D);
+	XFreeGC(D, Gc);
 	XCloseDisplay(D);
 
 	return 0;
