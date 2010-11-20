@@ -19,7 +19,7 @@ GC Gc;
 uint_fast16_t WX = 200, WY = 200;
 
 #define NCS(wut) \
-	e = wut; \
+	e = NCS##wut; \
 	if (e != NCS_SUCCESS) { \
 		printf("Error = %s\n", NCSGetErrorText(e)); \
 	}
@@ -28,7 +28,7 @@ NCSEcwReadStatus showcb(NCSFileView *fw) {
 	NCSError e;
 	NCSFileViewSetInfo *vi;
 
-	NCS(NCScbmGetViewInfo(fw, &vi));
+	NCS(cbmGetViewInfo(fw, &vi));
 
 	//printf("X %i Y %i avblks %i avblk %i mblk %i vblk %i\n", vi->nSizeX, vi->nSizeY, vi->nBlocksAvailableAtSetView, vi->nBlocksAvailable, vi->nMissedBlocksDuringRead, vi->nBlocksInView);
 	uint_fast32_t bpl = vi->nSizeX * 4;
@@ -61,35 +61,45 @@ NCSEcwReadStatus showcb(NCSFileView *fw) {
 	return NCSECW_READ_OK;
 }
 
-int main(int argc, char *argv[]) {
-	if (argc < 2) return 1;
-
+void initX() {
 	XInitThreads();
 	D = XOpenDisplay(NULL);
 	assert(D);
 	S = DefaultScreen(D);
 	W = XCreateSimpleWindow(D, RootWindow(D, S), 10, 10, WX, WY, 1,
                            BlackPixel(D, S), WhitePixel(D, S));
-	Gc = DefaultGC(D, S); //XCreateGC(D, W, 0, 0);
+	Gc = DefaultGC(D, S);
 	assert(Gc);
 	XSelectInput(D, W, ExposureMask | KeyPressMask | StructureNotifyMask);
 	XMapWindow(D, W);
+}
+
+void usage(char *argv[]) {
+	fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+	exit(1);
+}
+
+int main(int argc, char *argv[]) {
+	if (argc < 2) usage(argv);
 
 	NCSecwInit();
 	NCSError e;
 	NCSFileView *fw;
 	NCSFileViewFileInfo *fi;
 	NCSFileViewSetInfo *si;
-	NCS(NCScbmOpenFileView(argv[1], &fw, showcb));
-	NCS(NCScbmGetViewFileInfo(fw, &fi));
+
+	initX();
+
+	NCS(cbmOpenFileView(argv[1], &fw, showcb));
+	NCS(cbmGetViewFileInfo(fw, &fi));
 	printf("%i bands\n", fi->nBands);
-	NCS(NCScbmGetViewInfo(fw, &si));
+	NCS(cbmGetViewInfo(fw, &si));
 	uint32_t *bl = malloc(4 * bands);
 	for (uint_fast8_t i = 0; i < bands; i++)
 		bl[i] = i;
 
 	uint_fast32_t x = 0, y = 0, w = fi->nSizeX - 1, h = fi->nSizeY - 1;
-//	NCS(NCScbmSetFileView(fw, 3, bl, x, y, w, h, WX, WY));
+//	NCS(cbmSetFileView(fw, 3, bl, x, y, w, h, WX, WY));
 
 	bool run = true;
 	while (run) {
@@ -102,7 +112,7 @@ int main(int argc, char *argv[]) {
 			case ConfigureNotify:
 				WX = ev.xconfigure.width;
 				WY = ev.xconfigure.height;
-				//NCS(NCScbmSetFileView(fw, bands, bl, x, y, w, h, WX, WY));
+				//NCS(cbmSetFileView(fw, bands, bl, x, y, w, h, WX, WY));
 				break;
 			case KeyPress: {
 				XLockDisplay(D);
@@ -150,7 +160,7 @@ int main(int argc, char *argv[]) {
 					default:
 						printf("keysym %lx\n", ks);
 				}
-				NCS(NCScbmSetFileView(fw, bands, bl, x, y, w + x, h + y, WX, WY));
+				NCS(cbmSetFileView(fw, bands, bl, x, y, w + x, h + y, WX, WY));
 				}
 				break;
 			default:
@@ -159,7 +169,6 @@ int main(int argc, char *argv[]) {
 	}
 
 	XLockDisplay(D);
-	XFreeGC(D, Gc);
 	XCloseDisplay(D);
 
 	return 0;
