@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8)
+project(hateecw)
+set(CMAKE_C_FLAGS "-O0 -ggdb -std=c99 -Wall -Wextra -pedantic -D_POSIX_C_SOURCE=200809L")
+add_executable(hateecw hateecw.c)
+target_link_libraries(hateecw X11 NCSCnet NCSEcw NCSEcwC NCSUtil)
