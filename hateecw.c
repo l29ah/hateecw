@@ -30,7 +30,7 @@ NCSEcwReadStatus showcb(NCSFileView *fw) {
 
 	NCS(cbmGetViewInfo(fw, &vi));
 
-	//printf("X %i Y %i avblks %i avblk %i mblk %i vblk %i\n", vi->nSizeX, vi->nSizeY, vi->nBlocksAvailableAtSetView, vi->nBlocksAvailable, vi->nMissedBlocksDuringRead, vi->nBlocksInView);
+	printf("X %i Y %i avblks %i avblk %i mblk %i vblk %i\n", vi->nSizeX, vi->nSizeY, vi->nBlocksAvailableAtSetView, vi->nBlocksAvailable, vi->nMissedBlocksDuringRead, vi->nBlocksInView);
 	uint_fast32_t bpl = vi->nSizeX * 4;
 	uint8_t *img = malloc(bands * vi->nSizeY * bpl);
 	assert(img);
@@ -61,8 +61,22 @@ NCSEcwReadStatus showcb(NCSFileView *fw) {
 	return NCSECW_READ_OK;
 }
 
+#define ERR_BUF_SIZE 1024
+int x11_error_handler(Display* dpy, XErrorEvent* ee) {
+	char error_msg[ERR_BUF_SIZE];
+	char message[ERR_BUF_SIZE];
+	char default_string[ERR_BUF_SIZE];
+	XGetErrorText(dpy, ee->error_code, error_msg, ERR_BUF_SIZE);
+	XGetErrorDatabaseText(dpy, "XDAMAGE", message, "", error_msg, ERR_BUF_SIZE);
+	fprintf(stderr, "\n** error received from X server: %s\n%s\n%s\n", message, default_string, error_msg);
+	return 0;
+}
+
 void initX() {
-	XInitThreads();
+	Status s;
+
+	s = XInitThreads();
+	assert(s);
 	D = XOpenDisplay(NULL);
 	assert(D);
 	S = DefaultScreen(D);
@@ -70,7 +84,11 @@ void initX() {
                            BlackPixel(D, S), WhitePixel(D, S));
 	Gc = DefaultGC(D, S);
 	assert(Gc);
-	XSelectInput(D, W, ExposureMask | KeyPressMask | StructureNotifyMask);
+	XSelectInput(D, W, ExposureMask | 
+			   KeyPressMask | 
+			   StructureNotifyMask | 
+			   SubstructureNotifyMask);
+	XSetErrorHandler(x11_error_handler);
 	XMapWindow(D, W);
 }
 
@@ -113,6 +131,10 @@ int main(int argc, char *argv[]) {
 				WX = ev.xconfigure.width;
 				WY = ev.xconfigure.height;
 				//NCS(cbmSetFileView(fw, bands, bl, x, y, w, h, WX, WY));
+				break;
+			case DestroyNotify:
+				run = false;
+				puts("dn");
 				break;
 			case KeyPress: {
 				XLockDisplay(D);
@@ -157,8 +179,10 @@ int main(int argc, char *argv[]) {
 					case 'q':
 						run = false;
 						break;
+					/*
 					default:
 						printf("keysym %lx\n", ks);
+					*/
 				}
 				NCS(cbmSetFileView(fw, bands, bl, x, y, w + x, h + y, WX, WY));
 				}
